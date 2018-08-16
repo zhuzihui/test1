@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:c="http://www.springframework.org/schema/c"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/mvc 
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd  
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+
+	<!-- xmlns:context=... 以及下面俩个http:// 和《context:component-scan 》 为混合注解需要加进来的，去掉则为全配置方案 
+		混合配置 则次文件加个扫描《context:component-scan 》路径包 类上写上注解，此文件下面无需再写配置《bean /》 -->
+			
+			<!-- 扫描包一下所有的类是否使用注解 -->
+	<context:component-scan base-package="com.yc"/>
+		<!--  开启aspectj的支持 就是AOP切面支持  -->
+	<aop:aspectj-autoproxy ></aop:aspectj-autoproxy>
+
+	<!-- <bean id="sqlsessionFactory" class="com.example.JdbcCorporateEventDao"> 
+		<property name="dataSource" ref="dataSource"/> </bean> -->
+
+	<bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName" value="${jdbc.driverClassName}" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+	</bean>
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations" value="classpath:jdbc.properties" />
+	</bean>
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+		<!-- mybatis 有个配置文件： mapper映射文件，别名，log4j日志 -->
+		<!-- 优化: 不再需要 mybatis的配置文件, 配置mybatis中别名. 即配置这个选项后 可省略com.yc.bean -->
+		<property name="TypeAliasesPackage">
+			<array>
+				<value>com.yc.bean</value>
+			</array>
+		</property>
+		<!-- mapper映射文件的位置 -->
+		<property name="mapperLocations" value="classpath*:com/yc/*.xml" />
+		<!-- 主要用来配置mybatis中的 configuration中的settings配置 -->
+		<property name="configurationProperties">
+			<props>
+				<prop key="logImpl">LOG4J</prop>
+			</props>
+		</property>
+	</bean>
+
+	<!-- 配置sqlsession -->
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactory"></constructor-arg>
+	</bean>
+
+	<!-- mybatis使用与jdb同款的事务管理器 ：tx -->
+	<bean id="txManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	<!-- 启用事务注解 -->
+	<!-- <tx:annotation-driven transaction-manager="txManager" /> -->
+
+	<!-- <bean id="accountDaoImpl" class="com.yc.dao.impl.AccountDaoImpl">
+		<property name="sqlSessionTemplate" ref="sqlSession"></property>
+	</bean>
+	<bean id="opRecordDaoImpl" class="com.yc.dao.impl.OpRecordDaoImpl">
+		<property name="sqlSessionTemplate" ref="sqlSession"></property>
+	</bean>
+	<bean id="accountBizImpl" class="com.yc.biz.impl.AccountBizImpl">
+		<property name="accountDao" ref="accountDaoImpl"></property>
+		<property name="opRecordDao" ref="opRecordDaoImpl"></property>
+	</bean> -->
+
+	<!-- 生成事务的增强的切面类对象 -->
+	<tx:advice id="txAdvice" transaction-manager="txManager">
+		<!-- the transactional semantics... -->
+		<tx:attributes>
+			<tx:method name="get*" read-only="true" isolation="DEFAULT"
+				propagation="REQUIRED" />
+			<tx:method name="find*" read-only="true" isolation="DEFAULT"
+				propagation="REQUIRED" />
+			<tx:method name="select*" read-only="true" isolation="DEFAULT"
+				propagation="REQUIRED" />
+		</tx:attributes>
+	</tx:advice>
+
+
+	<!-- aop配置 -->
+	<aop:config>
+		<aop:pointcut expression="execution(* com.yc.*.*(..))" id="serviceOperation"/>
+		<aop:advisor advice-ref="txAdvice" pointcut-ref="serviceOperation"/>
+	</aop:config>
+	
+	
+    	<!--2. 开启注解解板器 ,默认注解注入     Controller-->  
+    <mvc:annotation-driven />  
+      
+    	<!--3.配置视图解析器，即根据注入对象得到返回值匹配到相应的js页面  -->  
+    <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">  
+        	<!-- 前缀 -->
+        <property name="prefix" value="/"></property>  
+        	<!-- 后缀 -->
+        <property name="suffix" value=".jsp"></property>  
+    </bean>  
+      
+	
+	
+</beans>

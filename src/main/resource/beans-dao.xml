@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:aop="http://www.springframework.org/schema/aop" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:c="http://www.springframework.org/schema/c"	xmlns:p="http://www.springframework.org/schema/p"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/tx
+        http://www.springframework.org/schema/tx/spring-tx.xsd
+        http://www.springframework.org/schema/mvc 
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd  
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/aop
+        http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+
+     
+    <bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource"
+		destroy-method="close">
+		<property name="driverClassName" value="${mysql.driverClassName}" />
+		<property name="url" value="${mysql.url}" />
+		<property name="username" value="${mysql.username}" />
+		<property name="password" value="${mysql.password}" />
+	</bean>
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+		<property name="locations" value="classpath:jdbc.properties" />
+	</bean>
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource"></property>
+		<!-- mybatis 有个配置文件： mapper映射文件，别名，log4j日志 -->
+		<!-- 优化: 不再需要 mybatis的配置文件, 配置mybatis中别名. 即配置这个选项后 可省略com.yc.bean -->
+		<property name="TypeAliasesPackage">
+			<array>
+				<value>com.yc.bean</value>
+			</array>
+		</property>
+		<!-- mapper映射文件的位置 -->
+		<property name="mapperLocations" value="classpath*:com/yc/dao/*.xml" />
+		<!-- 主要用来配置mybatis中的 configuration中的settings配置 -->
+		<property name="configurationProperties">
+			<props>
+				<prop key="logImpl">LOG4J</prop>
+			</props>
+		</property>
+	</bean>
+
+	<!-- 配置sqlsession -->
+	<bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+		<constructor-arg name="sqlSessionFactory" ref="sqlSessionFactory"></constructor-arg>
+	</bean>   
+	
+	<!-- mybatis使用与jdb同款的事务管理器 ：tx -->
+	<bean id="txManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	
+	
+	<bean id="accountDaoImpl" class="com.yc.dao.impl.AccountDaoImpl">
+		<property name="sqlSessionTemplate" ref="sqlSession"></property>
+	</bean>
+	<bean id="opRecordDaoImpl" class="com.yc.dao.impl.OpRecordDaoImpl">
+		<property name="sqlSessionTemplate" ref="sqlSession"></property>
+	</bean>
+	<bean id="accountBizImpl" class="com.yc.biz.impl.AccountBizImpl">
+		<property name="accountDao" ref="accountDaoImpl"></property>
+		<property name="opRecordDao" ref="opRecordDaoImpl"></property>
+	</bean>
+	<!-- !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! -->
+	<bean id="jobDetail" class="org.springframework.scheduling.quartz.MethodInvokingJobDetailFactoryBean">
+	    <property name="targetObject" ref="myjob"/>
+	    <property name="targetMethod" value="backUpDb"/>
+	    <property name="concurrent" value="false"/>
+	</bean>
+	
+	<bean id="cronTrigger" class="org.springframework.scheduling.quartz.CronTriggerFactoryBean">
+	    <property name="jobDetail" ref="jobDetail"/>
+	    <!-- run every morning at 6 AM -->
+	    <property name="cronExpression" value="0/10 * * * * ?"/>
+	</bean>
+	
+	<bean class="org.springframework.scheduling.quartz.SchedulerFactoryBean">
+	    <property name="triggers">
+	        <list>
+	            <ref bean="cronTrigger"/>
+	        </list>
+	    </property>
+	</bean>
+	
+</beans>
